@@ -51,4 +51,7 @@ override.tf.json
 
 # Exclude any other sensitive files
 *.log
+id_rsa
+.ssh/
+
 
