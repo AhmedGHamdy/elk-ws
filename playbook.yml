@@ -1,0 +1,106 @@
+---
+- name: Configure Monitoring Stack
+  hosts: monitoring_vm
+  become: true
+  tasks:
+    - name: Install required packages
+      apt:
+        name: 
+          - apt-transport-https
+          - openjdk-11-jdk
+          - python3-pip
+          - python3-venv
+        update_cache: yes
+        state: present
+
+    - name: Add Elastic GPG key
+      apt_key:
+        url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        state: present
+
+    - name: Add Elastic repository
+      apt_repository:
+        repo: deb https://artifacts.elastic.co/packages/8.x/apt stable main
+        state: present
+        filename: elastic-8.x
+
+    - name: Install Elasticsearch
+      apt:
+        name: elasticsearch
+        state: present
+        update_cache: yes
+
+    - name: Configure Elasticsearch
+      template:
+        src: elasticsearch.yml.j2
+        dest: /etc/elasticsearch/elasticsearch.yml
+      notify: restart elasticsearch
+
+    - name: Install APM Server
+      apt:
+        name: apm-server
+        state: present
+
+    - name: Configure APM Server
+      template:
+        src: apm-server.yml.j2
+        dest: /etc/apm-server/apm-server.yml
+      notify: restart apm-server
+
+    - name: Create app directory
+      file:
+        path: /opt/stock-stream
+        state: directory
+        mode: '0755'
+
+    - name: Copy application files
+      copy:
+        src: "{{ item }}"
+        dest: /opt/stock-stream/
+        mode: '0644'
+      with_items:
+        - main.py
+        - requirements.txt
+        - Dockerfile
+
+    - name: Create Python virtual environment
+      command: python3 -m venv /opt/stock-stream/venv
+      args:
+        creates: /opt/stock-stream/venv
+
+    - name: Install Python dependencies
+      pip:
+        requirements: /opt/stock-stream/requirements.txt
+        virtualenv: /opt/stock-stream/venv
+
+    - name: Create systemd service file
+      template:
+        src: stock-stream.service.j2
+        dest: /etc/systemd/system/stock-stream.service
+      notify: restart stock-stream
+
+    - name: Start and enable services
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      with_items:
+        - elasticsearch
+        - apm-server
+        - stock-stream
+
+  handlers:
+    - name: restart elasticsearch
+      systemd:
+        name: elasticsearch
+        state: restarted
+
+    - name: restart apm-server
+      systemd:
+        name: apm-server
+        state: restarted
+
+    - name: restart stock-stream
+      systemd:
+        name: stock-stream
+        state: restarted

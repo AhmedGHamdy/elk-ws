@@ -1,0 +1,20 @@
+cluster.name: monitoring-cluster
+node.name: monitoring-node
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+network.host: 0.0.0.0
+discovery.type: single-node
+
+# Security settings
+xpack.security.enabled: true
+xpack.security.transport.ssl.enabled: true
+
+# Memory settings
+bootstrap.memory_lock: true
+
+# Network settings
+http.port: 9200
+transport.port: 9300
+
+# Index settings
+action.auto_create_index: true

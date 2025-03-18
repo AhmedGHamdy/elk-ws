@@ -1,0 +1,47 @@
+http.host: "0.0.0.0"
+path.config: /etc/logstash/conf.d
+path.logs: /var/log/logstash
+
+pipeline:
+  batch.size: 125
+  batch.delay: 50
+
+# Queue settings
+queue.type: persisted
+queue.max_bytes: 1gb
+
+# Performance settings
+pipeline.workers: 2
+pipeline.batch.size: 125
+pipeline.batch.delay: 50
+
+# Monitoring settings
+xpack.monitoring.enabled: true
+xpack.monitoring.elasticsearch.hosts: ["http://localhost:9200"]
+
+# Pipeline configuration
+input {
+  beats {
+    port => 5044
+    ssl => false
+  }
+}
+
+filter {
+  if [type] == "websocket" {
+    grok {
+      match => { "message" => "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:log_level} %{GREEDYDATA:message}" }
+    }
+    date {
+      match => [ "timestamp", "ISO8601" ]
+      target => "@timestamp"
+    }
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["localhost:9200"]
+    index => "logstash-%{+YYYY.MM.dd}"
+  }
+}

@@ -1,0 +1,40 @@
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/stock-stream/*.log
+  fields:
+    app: stock-stream
+    type: application
+  fields_under_root: true
+  json.keys_under_root: true
+
+- type: log
+  enabled: true
+  paths:
+    - /var/log/apm-server/*.log
+  fields:
+    app: apm-server
+    type: monitoring
+  fields_under_root: true
+
+processors:
+- add_host_metadata: ~
+- add_cloud_metadata: ~
+- add_docker_metadata: ~
+
+output.logstash:
+  hosts: ["localhost:5044"]
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat.log
+  keepfiles: 7
+  permissions: 0644
+
+setup.kibana:
+  host: "localhost:5601"
+
+setup.dashboards.enabled: true

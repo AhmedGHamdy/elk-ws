@@ -1,0 +1,24 @@
+apm-server:
+  host: "0.0.0.0:8200"
+  rum:
+    enabled: true
+  auth:
+    secret_token: "${APM_SECRET_TOKEN}"
+
+output.elasticsearch:
+  hosts: ["localhost:9200"]
+  protocol: "http"
+  username: "${ELASTICSEARCH_USERNAME}"
+  password: "${ELASTICSEARCH_PASSWORD}"
+
+logging:
+  level: info
+  to_files: true
+  files:
+    path: /var/log/apm-server
+    name: apm-server.log
+    keepfiles: 7
+    permissions: 0644
+
+setup.kibana:
+  host: "localhost:5601"
