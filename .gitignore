@@ -1,4 +1,6 @@
 # Logs
+.ssh/
+id_rsa
 logs
 *.log
 npm-debug.log*
@@ -52,6 +54,6 @@ override.tf.json
 # Exclude any other sensitive files
 *.log
 id_rsa
-.ssh/
+
 
 

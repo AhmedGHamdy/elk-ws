@@ -7,7 +7,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentation
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 # Initialize FastAPI
 app = FastAPI()
@@ -21,7 +21,7 @@ tracer = trace.get_tracer(__name__)
 otlp_exporter = OTLPSpanExporter(endpoint="http://localhost:4317")
 span_processor = BatchSpanProcessor(otlp_exporter)
 trace.get_tracer_provider().add_span_processor(span_processor)
-FastAPIInstrumentation().instrument_app(app)
+FastAPIInstrumentor.instrument_app(app)  # Updated line
 
 # List of stock symbols to track
 STOCKS = ["AAPL", "GOOGL", "MSFT", "AMZN", "META"]
