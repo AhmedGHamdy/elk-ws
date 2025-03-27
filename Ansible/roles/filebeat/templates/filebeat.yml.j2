@@ -1,0 +1,8 @@
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/azure/stock_stream.log
+output.elasticsearch:
+  hosts: ["{{ vm_ip }}:9200"]
+

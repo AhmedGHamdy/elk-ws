@@ -1,0 +1,6 @@
+---
+- name: Restart APM Server
+  service:
+    name: apm-server
+    state: restarted
+

@@ -1,0 +1,19 @@
+---
+- name: Install APM Server
+  apt:
+    name: "apm-server={{ elastic_version }}"
+    state: present
+
+- name: Configure APM Server
+  template:
+    src: apm-server.yml.j2
+    dest: /etc/apm-server/apm-server.yml
+    mode: '0644'
+  notify: Restart APM Server
+
+- name: Start and enable APM Server
+  service:
+    name: apm-server
+    state: started
+    enabled: yes
+

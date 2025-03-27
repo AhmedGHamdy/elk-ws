@@ -1,0 +1,12 @@
+---
+- name: Deploy Complete Monitoring Stack on Azure VM
+  hosts: monitoring_vm
+  become: true
+  roles:
+    - common
+    - elasticsearch
+    - kibana
+    - apm-server
+    - otel-collector
+    - filebeat
+

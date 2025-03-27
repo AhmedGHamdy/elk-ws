@@ -1,0 +1,19 @@
+---
+- name: Install Elasticsearch
+  apt:
+    name: "elasticsearch={{ elastic_version }}"
+    state: present
+
+- name: Configure Elasticsearch
+  template:
+    src: elasticsearch.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+    mode: '0644'
+  notify: Restart Elasticsearch
+
+- name: Start and enable Elasticsearch
+  service:
+    name: elasticsearch
+    state: started
+    enabled: yes
+

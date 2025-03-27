@@ -1,0 +1,5 @@
+---
+elastic_version: "8.12.0"
+vm_ip: "{{ ansible_host }}"
+azure_storage_url: "https://<storage-account>.blob.core.windows.net/<container>/application"  # Replace with your Blob Storage URL
+

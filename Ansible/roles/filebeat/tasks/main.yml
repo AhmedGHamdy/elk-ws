@@ -1,0 +1,43 @@
+---
+- name: Install Filebeat
+  apt:
+    name: "filebeat={{ elastic_version }}"
+    state: present
+
+- name: Create log directory for Filebeat
+  file:
+    path: /var/log/azure
+    state: directory
+    mode: '0755'
+
+- name: Configure Filebeat
+  template:
+    src: filebeat.yml.j2
+    dest: /etc/filebeat/filebeat.yml
+    mode: '0644'
+  notify: Restart Filebeat
+
+- name: Install azcopy
+  shell: |
+    wget -qO- https://aka.ms/downloadazcopy-v10-linux | tar -xz -C /usr/local/bin --strip-components=1
+  args:
+    creates: /usr/local/bin/azcopy
+
+- name: Set permissions for azcopy
+  file:
+    path: /usr/local/bin/azcopy
+    mode: '0755'
+
+- name: Add azcopy sync to cron
+  cron:
+    name: "Sync Azure logs"
+    minute: "*/5"
+    job: "azcopy sync '{{ azure_storage_url }}' '/var/log/azure' --recursive"
+    state: present
+
+- name: Start and enable Filebeat
+  service:
+    name: filebeat
+    state: started
+    enabled: yes
+

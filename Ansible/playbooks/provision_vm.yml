@@ -1,0 +1,46 @@
+---
+- name: Provision Azure VM with Azure CLI
+  hosts: localhost
+  vars:
+    resource_group: monitoring-rg
+    location: eastus
+    vm_name: monitoring-vm
+    vm_size: Standard_D2s_v3
+    admin_username: adminuser
+    ssh_public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+  tasks:
+    - name: Install Azure CLI
+      shell: |
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+      args:
+        creates: /usr/bin/az
+
+    - name: Log in to Azure (manual step or use service principal)
+      shell: az login --service-principal -u "{{ lookup('env', 'AZURE_CLIENT_ID') }}" -p "{{ lookup('env', 'AZURE_SECRET') }}" --tenant "{{ lookup('env', 'AZURE_TENANT_ID') }}"
+      environment:
+        AZURE_CLIENT_ID: "<your-client-id>"
+        AZURE_SECRET: "<your-secret>"
+        AZURE_TENANT_ID: "<your-tenant-id>"
+
+    - name: Create resource group
+      shell: az group create --name {{ resource_group }} --location {{ location }}
+      register: rg_result
+      changed_when: rg_result.rc == 0
+
+    - name: Create VM with public IP and open ports
+      shell: |
+        az vm create \
+          --resource-group {{ resource_group }} \
+          --name {{ vm_name }} \
+          --image UbuntuLTS \
+          --size {{ vm_size }} \
+          --admin-username {{ admin_username }} \
+          --ssh-key-values "{{ ssh_public_key }}" \
+          --public-ip-sku Standard \
+          --nsg-rule SSH,9200,5601,8200
+      register: vm_result
+
+    - name: Display VM public IP
+      debug:
+        msg: "VM created with IP: {{ (vm_result.stdout | from_json).publicIpAddress }}"
+

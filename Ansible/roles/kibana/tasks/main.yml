@@ -1,0 +1,19 @@
+---
+- name: Install Kibana
+  apt:
+    name: "kibana={{ elastic_version }}"
+    state: present
+
+- name: Configure Kibana
+  template:
+    src: kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    mode: '0644'
+  notify: Restart Kibana
+
+- name: Start and enable Kibana
+  service:
+    name: kibana
+    state: started
+    enabled: yes
+

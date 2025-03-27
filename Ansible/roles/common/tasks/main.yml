@@ -1,0 +1,25 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install prerequisites
+  apt:
+    name:
+      - openjdk-11-jre
+      - apt-transport-https
+      - wget
+    state: present
+
+- name: Add Elastic APT key
+  ansible.builtin.apt_key:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+
+- name: Add Elastic repository
+  ansible.builtin.apt_repository:
+    repo: "deb https://artifacts.elastic.co/packages/{{ elastic_version.split('.')[0] }}.x/apt stable main"
+    state: present
+    update_cache: yes
+
