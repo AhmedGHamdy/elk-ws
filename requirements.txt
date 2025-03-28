@@ -1,6 +1,7 @@
 fastapi
 uvicorn[standard]
 gunicorn
+uvicorn
 yfinance
 elastic-apm
 opentelemetry-api
@@ -8,3 +9,4 @@ opentelemetry-sdk
 opentelemetry-exporter-otlp-proto-grpc
 opentelemetry-exporter-otlp-proto-http
 opentelemetry-instrumentation-fastapi
+psutil

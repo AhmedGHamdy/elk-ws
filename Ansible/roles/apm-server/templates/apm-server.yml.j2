@@ -2,6 +2,12 @@ apm-server:
   host: "0.0.0.0:8200"
   otlp:
     enabled: true
+
 output.elasticsearch:
   hosts: ["{{ vm_ip }}:9200"]
+  username: "elastic"
+  password: "N_SpnOGR=MGGtcWgvHqP"
+
+setup.kibana:
+  host: "http://localhost:5601"
 
