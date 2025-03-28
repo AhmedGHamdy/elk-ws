@@ -26,13 +26,13 @@ app.add_middleware(
 app.add_middleware(
     ElasticAPM,
     service_name="stock-stream-service",
-    server_url="http://localhost:8200"  # تأكد إنه متاح
+    server_url="http://13.64.239.182:8200"  
 )
 
 # OpenTelemetry setup (optional if backend collector is ready)
 trace.set_tracer_provider(TracerProvider())
 tracer = trace.get_tracer(__name__)
-otlp_exporter = OTLPSpanExporter(endpoint="http://localhost:4317", insecure=True)
+otlp_exporter = OTLPSpanExporter(endpoint="http://13.64.239.182:4317", insecure=True)
 trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(otlp_exporter))
 FastAPIInstrumentor.instrument_app(app)
 
