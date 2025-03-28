@@ -1,52 +1,39 @@
 import asyncio
 import json
-import logging
 import yfinance as yf
 from fastapi import FastAPI, WebSocket
-from elasticapm.contrib.starlette import ElasticAPM, make_apm_client
+from fastapi.middleware.cors import CORSMiddleware
+from elasticapm.contrib.starlette import ElasticAPM
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.semconv.resource import ResourceAttributes
-
-# Configure logging
-logging.basicConfig(
-    filename='/home/LogFiles/application/stock_stream.log',
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(message)s'
-)
-logger = logging.getLogger(__name__)
+from opentelemetry.trace import Status, StatusCode
 
 app = FastAPI()
 
-# Configure Elastic APM
-apm = make_apm_client({
-    'SERVICE_NAME': 'stock-stream-service',
-    'SERVER_URL': 'http://<vm-public-ip>:8200',  # Replace with VM IP
-    'ENVIRONMENT': 'production'
-})
-app.add_middleware(ElasticAPM, client=apm)
-
-# Configure OpenTelemetry
-resource = Resource.create({
-    ResourceAttributes.SERVICE_NAME: "stock-stream-service",
-    ResourceAttributes.SERVICE_VERSION: "1.0.0",
-    ResourceAttributes.DEPLOYMENT_ENVIRONMENT: "production"
-})
-tracer_provider = TracerProvider(resource=resource)
-trace.set_tracer_provider(tracer_provider)
-
-# Use APM Server's OTLP endpoint
-otlp_exporter = OTLPSpanExporter(
-    endpoint="http://<vm-public-ip>:8200/v1/traces"  # Corrected to APM Server OTLP endpoint
+# Allow frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-span_processor = BatchSpanProcessor(otlp_exporter)
-tracer_provider.add_span_processor(span_processor)
 
+# Elastic APM Middleware
+app.add_middleware(
+    ElasticAPM,
+    service_name="stock-stream-service",
+    server_url="http://localhost:8200"  # تأكد إنه متاح
+)
+
+# OpenTelemetry setup (optional if backend collector is ready)
+trace.set_tracer_provider(TracerProvider())
 tracer = trace.get_tracer(__name__)
+otlp_exporter = OTLPSpanExporter(endpoint="http://localhost:4317", insecure=True)
+trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(otlp_exporter))
 FastAPIInstrumentor.instrument_app(app)
 
 STOCKS = ["AAPL", "GOOGL", "MSFT", "AMZN", "META"]
@@ -58,41 +45,30 @@ async def get_stock_price(symbol: str):
             stock = yf.Ticker(symbol)
             price = stock.info.get('regularMarketPrice', 0)
             span.set_attribute("price", price)
-            logger.info(f"Fetched price for {symbol}: {price}")
             return {"symbol": symbol, "price": price}
         except Exception as e:
             span.record_exception(e)
-            span.set_status(trace.Status(trace.StatusCode.ERROR))
-            logger.error(f"Error fetching {symbol}: {e}")
+            span.set_status(Status(StatusCode.ERROR))
             return {"symbol": symbol, "price": None, "error": str(e)}
 
 async def price_generator():
     while True:
         with tracer.start_as_current_span("price_generator"):
-            prices = []
-            for symbol in STOCKS:
-                price_data = await get_stock_price(symbol)
-                prices.append(price_data)
+            prices = [await get_stock_price(symbol) for symbol in STOCKS]
             yield json.dumps(prices)
             await asyncio.sleep(5)
 
 @app.websocket("/ws/stocks")
 async def websocket_endpoint(websocket: WebSocket):
-    with tracer.start_as_current_span("websocket_connection") as span:
+    with tracer.start_as_current_span("websocket_connection"):
         await websocket.accept()
-        client = websocket.client
-        span.set_attribute("client.ip", str(client.host) if client else "unknown")
-        logger.info("WebSocket connection established")
         try:
             async for prices in price_generator():
                 await websocket.send_text(prices)
         except Exception as e:
-            logger.error(f"WebSocket error: {e}")
-            span.record_exception(e)
-            span.set_status(trace.Status(trace.StatusCode.ERROR))
+            print(f"WebSocket error: {e}")
         finally:
             await websocket.close()
-            logger.info("WebSocket connection closed")
 
 @app.get("/")
 async def root():

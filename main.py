@@ -2,32 +2,43 @@ import asyncio
 import json
 import yfinance as yf
 from fastapi import FastAPI, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
 from elasticapm.contrib.starlette import ElasticAPM
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.trace import Status, StatusCode
 
-# Initialize FastAPI
 app = FastAPI()
 
-# Configure Elastic APM
-app.add_middleware(ElasticAPM, service_name="stock-stream-service", server_url="http://localhost:8200")
+# Allow frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Configure OpenTelemetry
+# Elastic APM Middleware
+app.add_middleware(
+    ElasticAPM,
+    service_name="stock-stream-service",
+    server_url="http://localhost:8200"  # تأكد إنه متاح
+)
+
+# OpenTelemetry setup (optional if backend collector is ready)
 trace.set_tracer_provider(TracerProvider())
 tracer = trace.get_tracer(__name__)
-otlp_exporter = OTLPSpanExporter(endpoint="http://localhost:4317")
-span_processor = BatchSpanProcessor(otlp_exporter)
-trace.get_tracer_provider().add_span_processor(span_processor)
-FastAPIInstrumentor.instrument_app(app)  # Updated line
+otlp_exporter = OTLPSpanExporter(endpoint="http://localhost:4317", insecure=True)
+trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(otlp_exporter))
+FastAPIInstrumentor.instrument_app(app)
 
-# List of stock symbols to track
 STOCKS = ["AAPL", "GOOGL", "MSFT", "AMZN", "META"]
 
 async def get_stock_price(symbol: str):
-    """Get real-time stock price using yfinance"""
     with tracer.start_as_current_span("get_stock_price") as span:
         span.set_attribute("stock_symbol", symbol)
         try:
@@ -37,23 +48,18 @@ async def get_stock_price(symbol: str):
             return {"symbol": symbol, "price": price}
         except Exception as e:
             span.record_exception(e)
-            span.set_status(trace.Status(trace.StatusCode.ERROR))
+            span.set_status(Status(StatusCode.ERROR))
             return {"symbol": symbol, "price": None, "error": str(e)}
 
 async def price_generator():
-    """Generate stock prices every 5 seconds"""
     while True:
         with tracer.start_as_current_span("price_generator"):
-            prices = []
-            for symbol in STOCKS:
-                price_data = await get_stock_price(symbol)
-                prices.append(price_data)
+            prices = [await get_stock_price(symbol) for symbol in STOCKS]
             yield json.dumps(prices)
             await asyncio.sleep(5)
 
 @app.websocket("/ws/stocks")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for streaming stock prices"""
     with tracer.start_as_current_span("websocket_connection"):
         await websocket.accept()
         try:
@@ -66,5 +72,4 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
     return {"status": "ok", "service": "stock-stream-service"}
